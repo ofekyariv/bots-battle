@@ -62,6 +62,7 @@ export default function EditorPage() {
     setConsoleCollapsed,
     llmCopyStatus,
     record,
+    isAuthenticated,
     loadBotData,
     handleBeforeMount,
     handleMount,
@@ -103,6 +104,7 @@ export default function EditorPage() {
         onSave={() => handleSave()}
         onRunTest={handleRunTest}
         onCopyForLLM={handleCopyForLLM}
+        isAuthenticated={isAuthenticated}
       />
 
       {/* ══ MAIN AREA ════════════════════════════════════════════ */}

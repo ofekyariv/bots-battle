@@ -3,7 +3,6 @@
 //   bot styles, game settings, and last-state persistence
 // ============================================================
 
-import { runMigrations } from './migrations';
 import { parseMatchResultArray, PlayerOpponentRecordSchema, BotStyleSchema } from './schemas';
 import type { MatchResult, PlayerOpponentRecord, BotStyle } from './schemas';
 
@@ -31,7 +30,6 @@ function isBrowser(): boolean {
 
 function readMatchResults(): MatchResult[] {
   if (!isBrowser()) return [];
-  runMigrations();
   try {
     const raw = localStorage.getItem(MATCH_RESULTS_KEY);
     if (!raw) return [];

@@ -25,6 +25,7 @@ export function EditorToolbar({
   onSave,
   onRunTest,
   onCopyForLLM,
+  isAuthenticated,
 }: EditorToolbarProps) {
   return (
     <div
@@ -102,18 +103,29 @@ export function EditorToolbar({
       )}
 
       {/* Save */}
-      <button
-        onClick={onSave}
-        aria-label="Save bot (Ctrl+S)"
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors shrink-0"
-        style={{
-          background: isDirty ? '#d97706' : '#1e3a5f',
-          color: isDirty ? '#0a0e1a' : '#94a3b8',
-        }}
-        title="Save bot (Ctrl+S)"
-      >
-        💾 Save
-      </button>
+      {isAuthenticated ? (
+        <button
+          onClick={onSave}
+          aria-label="Save bot (Ctrl+S)"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors shrink-0"
+          style={{
+            background: isDirty ? '#d97706' : '#1e3a5f',
+            color: isDirty ? '#0a0e1a' : '#94a3b8',
+          }}
+          title="Save bot (Ctrl+S)"
+        >
+          💾 Save
+        </button>
+      ) : (
+        <a
+          href="/login"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors shrink-0"
+          style={{ background: '#1e3a5f', color: '#94a3b8' }}
+          title="Sign in to save bots"
+        >
+          🔒 Sign in to save
+        </a>
+      )}
 
       {/* Save status */}
       {saveStatus && (

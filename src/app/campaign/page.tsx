@@ -20,7 +20,7 @@ import {
   resetCampaignProgress,
 } from '@/lib/campaign';
 import type { CampaignProgress as CampaignProgressData } from '@/lib/campaign';
-import { getBotById as getStoredBotById, listBots } from '@/lib/storage';
+import { listBots, getBot as getStoredBotById } from '@/lib/api/bots';
 // PlayerBotBadge no longer needed (CampaignFleet handles display)
 import { useGameContext } from '@/lib/GameContext';
 import { cn } from '@/lib/utils';
@@ -41,7 +41,7 @@ export default function CampaignPage() {
   const [playerBotId, setPlayerBotId] = useState<string>('');
   const [victoryMessage, setVictoryMessage] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [customBots, setCustomBots] = useState<ReturnType<typeof listBots>>([]);
+  const [customBots, setCustomBots] = useState<Awaited<ReturnType<typeof listBots>>>([]);
 
   // Initialize: load bots, restore last selection, expand current level
   useEffect(() => {
@@ -49,7 +49,9 @@ export default function CampaignPage() {
     setProgress(p);
     setExpandedLevel(p.currentLevel);
 
-    setCustomBots(listBots());
+    listBots()
+      .then((data) => setCustomBots(data))
+      .catch(() => setCustomBots([]));
 
     // Check for victory message from returning game
     const victoryRaw =
@@ -67,7 +69,7 @@ export default function CampaignPage() {
   const hasCustomBots = customBots.length > 0;
 
   const handleChallenge = useCallback(
-    (levelNum: number, botIndex: number) => {
+    async (levelNum: number, botIndex: number) => {
       if (!playerBotId || !hasCustomBots) return;
 
       const levelDef = CAMPAIGN_LEVELS.find((l) => l.level === levelNum);
@@ -75,10 +77,13 @@ export default function CampaignPage() {
       const bot = levelDef.bots[botIndex];
       const cfg = getLevelConfig(levelDef);
 
-      const savedBot = getStoredBotById(playerBotId);
-      const p1Source: Parameters<typeof updatePlayer1>[0] = savedBot
-        ? { type: 'custom', code: savedBot.code, savedBotId: savedBot.id }
-        : { type: 'preset', id: 'balanced' }; // fallback should never happen
+      let p1Source: Parameters<typeof updatePlayer1>[0];
+      try {
+        const savedBot = await getStoredBotById(playerBotId);
+        p1Source = { type: 'custom', code: savedBot.code, savedBotId: savedBot.id };
+      } catch {
+        p1Source = { type: 'preset', id: 'balanced' }; // fallback if bot not found
+      }
 
       updatePlayer1(p1Source);
       updatePlayer2({ type: 'preset', id: bot.id });
@@ -99,7 +104,9 @@ export default function CampaignPage() {
   const handleBotSelect = useCallback((botId: string) => {
     setPlayerBotId(botId);
     setCampaignSelectedBot(botId);
-    setCustomBots(listBots());
+    listBots()
+      .then((data) => setCustomBots(data))
+      .catch(() => {});
   }, []);
 
   return (

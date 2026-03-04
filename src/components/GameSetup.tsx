@@ -34,8 +34,8 @@ import {
   loadLastOpponent,
   saveLastPreset,
   loadLastPreset,
-  getBotById as getSavedBotById,
 } from '@/lib/storage';
+import { getBot as getSavedBotById } from '@/lib/api/bots';
 import { DEFAULT_CONFIG, type GameConfig } from '@/engine/types';
 import { useGameContext, type BotSource } from '@/lib/GameContext';
 import FleetGrid from '@/components/FleetGrid';
@@ -206,47 +206,53 @@ export default function GameSetup() {
 
   // ── Hydrate from localStorage on mount ──────────────────────────
   useEffect(() => {
-    // Restore saved game config
-    const savedConfig = loadGameSettings();
-    if (savedConfig) {
-      const merged = { ...DEFAULT_CONFIG, ...savedConfig } as GameConfig;
-      updateConfig(merged);
-    }
+    const hydrate = async () => {
+      // Restore saved game config
+      const savedConfig = loadGameSettings();
+      if (savedConfig) {
+        const merged = { ...DEFAULT_CONFIG, ...savedConfig } as GameConfig;
+        updateConfig(merged);
+      }
 
-    // Restore last opponent (supports both preset and custom/saved bots)
-    const lastOpponent = loadLastOpponent();
-    if (lastOpponent) {
-      try {
-        const parsed = JSON.parse(lastOpponent);
-        if (parsed.type === 'custom' && parsed.savedBotId) {
-          // Re-load code from storage in case it was updated
-          const full = getSavedBotById(parsed.savedBotId);
-          if (full) {
-            updatePlayer2({ type: 'custom', code: full.code, savedBotId: parsed.savedBotId });
+      // Restore last opponent (supports both preset and custom/saved bots)
+      const lastOpponent = loadLastOpponent();
+      if (lastOpponent) {
+        try {
+          const parsed = JSON.parse(lastOpponent);
+          if (parsed.type === 'custom' && parsed.savedBotId) {
+            // Re-load code from server API in case it was updated
+            try {
+              const full = await getSavedBotById(parsed.savedBotId);
+              updatePlayer2({ type: 'custom', code: full.code, savedBotId: parsed.savedBotId });
+            } catch {
+              // Bot not found or unauthenticated — skip
+            }
+          } else if (parsed.type === 'preset' && parsed.id) {
+            const validBot = BOT_REGISTRY.find((b: { id: string }) => b.id === parsed.id);
+            if (validBot) updatePlayer2({ type: 'preset', id: parsed.id });
           }
-        } else if (parsed.type === 'preset' && parsed.id) {
-          const validBot = BOT_REGISTRY.find((b: { id: string }) => b.id === parsed.id);
-          if (validBot) updatePlayer2({ type: 'preset', id: parsed.id });
-        }
-      } catch {
-        // Legacy format: plain string ID
-        const validBot = BOT_REGISTRY.find((b) => b.id === lastOpponent);
-        if (validBot) {
-          updatePlayer2({ type: 'preset', id: lastOpponent });
+        } catch {
+          // Legacy format: plain string ID
+          const validBot = BOT_REGISTRY.find((b) => b.id === lastOpponent);
+          if (validBot) {
+            updatePlayer2({ type: 'preset', id: lastOpponent });
+          }
         }
       }
-    }
 
-    // Restore last preset
-    const lastPreset = loadLastPreset();
-    if (lastPreset && (lastPreset in PRESET_CONFIGS || lastPreset === 'custom')) {
-      setActivePreset(lastPreset);
-    } else if (savedConfig) {
-      const detected = detectPreset({ ...DEFAULT_CONFIG, ...savedConfig } as GameConfig);
-      setActivePreset(detected);
-    }
+      // Restore last preset
+      const lastPreset = loadLastPreset();
+      if (lastPreset && (lastPreset in PRESET_CONFIGS || lastPreset === 'custom')) {
+        setActivePreset(lastPreset);
+      } else if (savedConfig) {
+        const detected = detectPreset({ ...DEFAULT_CONFIG, ...savedConfig } as GameConfig);
+        setActivePreset(detected);
+      }
 
-    setHydrated(true);
+      setHydrated(true);
+    };
+
+    hydrate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

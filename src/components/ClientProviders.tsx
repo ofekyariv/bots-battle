@@ -10,39 +10,38 @@
 import * as React from 'react';
 import { SessionProvider, useSession } from 'next-auth/react';
 import { GameProvider } from '@/lib/GameContext';
-import { BotMigrationModal } from '@/components/auth/BotMigrationModal';
-import { detectLocalBots, isMigrationComplete } from '@/lib/migration';
+import { listBots, saveBot } from '@/lib/api/bots';
+import { STARTER_BOT_CODE } from '@/lib/constants/starter-codes';
 
 // ─────────────────────────────────────────────
-// Inner component — needs SessionProvider above it
+// Auto-seed Starter Bot for new authenticated users
 // ─────────────────────────────────────────────
 
-function MigrationGate({ children }: { children: React.ReactNode }) {
+function StarterBotSeeder({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
-  const [showModal, setShowModal] = React.useState(false);
+  const seededRef = React.useRef(false);
 
   React.useEffect(() => {
-    // Only show after session is confirmed and user is logged in
-    if (status !== 'authenticated') return;
-    if (isMigrationComplete()) return;
+    if (status !== 'authenticated' || seededRef.current) return;
+    seededRef.current = true;
 
-    const localBots = detectLocalBots();
-    if (localBots.length > 0) {
-      setShowModal(true);
-    } else {
-      // No local bots — nothing to migrate, mark done silently
-      // (don't mark complete so future bots could still be caught)
-    }
+    // Check if the user has any bots; if not, create a Starter Bot
+    listBots()
+      .then((bots) => {
+        if (bots.length === 0) {
+          return saveBot({
+            name: 'Starter Bot',
+            language: 'javascript',
+            code: STARTER_BOT_CODE,
+          });
+        }
+      })
+      .catch(() => {
+        // Silently ignore — not critical
+      });
   }, [status, session]);
 
-  return (
-    <>
-      {showModal && (
-        <BotMigrationModal onDone={() => setShowModal(false)} />
-      )}
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
 
 // ─────────────────────────────────────────────
@@ -53,7 +52,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
   return (
     <SessionProvider>
       <GameProvider>
-        <MigrationGate>{children}</MigrationGate>
+        <StarterBotSeeder>{children}</StarterBotSeeder>
       </GameProvider>
     </SessionProvider>
   );

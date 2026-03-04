@@ -3,7 +3,6 @@
 // ─────────────────────────────────────────────────────────────
 
 import { getBotById } from '@/bots/index';
-import { getBotById as getSavedBotById } from '@/lib/storage';
 import type { BotSource as UseGameBotSource } from '@/lib/useGame';
 
 /** Convert GameContext BotSource → useGame BotSource */
@@ -29,11 +28,7 @@ export function getBotName(source: { type: string; id?: string; savedBotId?: str
     const entry = getBotById(source.id);
     return entry ? entry.name : source.id;
   }
-  if (source.type === 'custom' && source.savedBotId) {
-    const entry = getBotById(source.savedBotId);
-    if (entry) return entry.name;
-    const saved = getSavedBotById(source.savedBotId);
-    return saved ? saved.name : 'Custom Bot';
-  }
+  // For custom bots, we don't have a sync lookup — return a placeholder
+  // (the actual name is available when the bot is loaded from the API)
   return 'Custom Bot';
 }

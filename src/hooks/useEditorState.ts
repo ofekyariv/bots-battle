@@ -2,21 +2,20 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import { ROUTES } from '@/lib/routes';
 import {
-  saveOrUpdateBot,
-  deleteBotById,
   listBots,
-  getBotById,
+  getBot,
+  saveBot as saveApiBot,
+  deleteBot as deleteApiBot,
+} from '@/lib/api/bots';
+import type { BotMeta, BotWithCode } from '@/lib/api/bots';
+import {
   getBotRecord,
   setLastEditedBotId,
   getLastEditedBotId,
-  addBotVersion,
-  uuid,
-  type BotMeta,
-  type BotVersion,
-  type SavedBot,
 } from '@/lib/storage';
 import { useGameContext } from '@/lib/GameContext';
 import {
@@ -36,7 +35,7 @@ import { isKotlinCode, KotlinSandboxedBot } from '@/lib/kotlinSandbox';
 import { isCSharpCode, CSharpSandboxedBot } from '@/lib/csharpSandbox';
 import { isJavaCode, JavaSandboxedBot } from '@/lib/javaSandbox';
 import { isSwiftCode, SwiftSandboxedBot } from '@/lib/swiftSandbox';
-import type { LogEntry, LogLevel, WinRecord, EditorLanguage } from '@/components/editor/types';
+import type { LogEntry, LogLevel, WinRecord, EditorLanguage, BotVersion } from '@/components/editor/types';
 
 // ─────────────────────────────────────────────
 // Log helpers
@@ -384,6 +383,8 @@ function detectLanguage(code: string, fallback?: EditorLanguage): EditorLanguage
 export function useEditorState() {
   const router = useRouter();
   const { updatePlayer1 } = useGameContext();
+  const { status: sessionStatus } = useSession();
+  const isAuthenticated = sessionStatus === 'authenticated';
 
   // Monaco refs
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
@@ -396,12 +397,12 @@ export function useEditorState() {
   const [isDirty, setIsDirty] = useState(false);
   const [editorLanguage, setEditorLanguage] = useState<EditorLanguage>('javascript');
 
-  // Bots list
+  // Bots list (from server)
   const [savedBots, setSavedBots] = useState<BotMeta[]>([]);
   const [showBotDropdown, setShowBotDropdown] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
-  // Versions / sidebar
+  // Versions (session-only, not persisted)
   const [versions, setVersions] = useState<BotVersion[]>([]);
   const [sidebarTab, setSidebarTab] = useState<'docs' | 'history' | 'examples'>('docs');
 
@@ -426,7 +427,18 @@ export function useEditorState() {
 
   const addLog = useCallback((entry: LogEntry) => setLogs((prev) => [...prev, entry]), []);
 
-  const refreshBots = useCallback(() => setSavedBots(listBots()), []);
+  const refreshBots = useCallback(async () => {
+    if (!isAuthenticated) {
+      setSavedBots([]);
+      return;
+    }
+    try {
+      const bots = await listBots();
+      setSavedBots(bots);
+    } catch {
+      setSavedBots([]);
+    }
+  }, [isAuthenticated]);
 
   const refreshRecord = useCallback((botId: string) => setRecord(getBotRecord(botId)), []);
 
@@ -456,12 +468,12 @@ export function useEditorState() {
   // ── Load a bot into the editor ──────────────────────────────────
 
   const loadBotData = useCallback(
-    (bot: SavedBot) => {
+    (bot: BotWithCode) => {
       const lang = detectLanguage(bot.code, bot.language as EditorLanguage | undefined);
       setCode(bot.code);
       setBotName(bot.name);
       setCurrentBotId(bot.id);
-      setVersions(bot.versions ?? []);
+      setVersions([]); // Version history not returned by server API
       setIsDirty(false);
       setEditorLanguage(lang);
       setLastEditedBotId(bot.id);
@@ -473,7 +485,7 @@ export function useEditorState() {
       addLog(
         makeLog(
           'info',
-          `📂 Loaded bot: "${bot.name}" (${lang.toUpperCase()}, ${(bot.versions ?? []).length} versions)`,
+          `📂 Loaded bot: "${bot.name}" (${lang.toUpperCase()})`,
         ),
       );
     },
@@ -483,26 +495,41 @@ export function useEditorState() {
   // ── On mount ────────────────────────────────────────────────────
 
   useEffect(() => {
-    refreshBots();
-    const params = new URLSearchParams(window.location.search);
-    // ?new=1 → start fresh, don't load any bot
-    if (params.get('new') === '1') return;
-    const lastId = getLastEditedBotId();
-    const loadId = params.get('load') ?? lastId;
-    if (loadId) {
-      const bot = getBotById(loadId);
-      if (bot) {
-        const lang = detectLanguage(bot.code, bot.language as EditorLanguage | undefined);
-        setCode(bot.code);
-        setBotName(bot.name);
-        setCurrentBotId(bot.id);
-        setVersions(bot.versions ?? []);
-        setEditorLanguage(lang);
-        refreshRecord(bot.id);
+    const loadInitial = async () => {
+      // Fetch bot list
+      if (isAuthenticated) {
+        try {
+          const bots = await listBots();
+          setSavedBots(bots);
+        } catch {
+          setSavedBots([]);
+        }
       }
-    }
+
+      const params = new URLSearchParams(window.location.search);
+      // ?new=1 → start fresh, don't load any bot
+      if (params.get('new') === '1') return;
+
+      const lastId = getLastEditedBotId();
+      const loadId = params.get('load') ?? lastId;
+      if (loadId && isAuthenticated) {
+        try {
+          const bot = await getBot(loadId);
+          const lang = detectLanguage(bot.code, bot.language as EditorLanguage | undefined);
+          setCode(bot.code);
+          setBotName(bot.name);
+          setCurrentBotId(bot.id);
+          setVersions([]);
+          setEditorLanguage(lang);
+          refreshRecord(bot.id);
+        } catch {
+          // Bot not found or auth error — start fresh
+        }
+      }
+    };
+    loadInitial();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthenticated]);
 
   // ── Monaco handlers ─────────────────────────────────────────────
 
@@ -557,7 +584,12 @@ export function useEditorState() {
   // ── Save ────────────────────────────────────────────────────────
 
   const handleSave = useCallback(
-    (versionNote?: string) => {
+    async (versionNote?: string) => {
+      if (!isAuthenticated) {
+        setSaveStatus({ ok: false, msg: 'Sign in to save bots' });
+        setTimeout(() => setSaveStatus(null), 3000);
+        return null;
+      }
       const currentCode = editorRef.current?.getValue() ?? code;
       if (!botName.trim()) {
         setSaveStatus({ ok: false, msg: 'Bot name cannot be empty' });
@@ -565,16 +597,21 @@ export function useEditorState() {
         return null;
       }
       try {
-        const id = currentBotId ?? uuid();
-        const saved = saveOrUpdateBot(id, botName.trim(), currentCode, versionNote, editorLanguage);
+        const saved = await saveApiBot({
+          id: currentBotId ?? undefined,
+          name: botName.trim(),
+          language: editorLanguage as import('@/lib/api/bots').BotLanguage,
+          code: currentCode,
+        });
         setCurrentBotId(saved.id);
-        setVersions(saved.versions ?? []);
+        setVersions([]);
         setIsDirty(false);
         setLastEditedBotId(saved.id);
-        refreshBots();
+        await refreshBots();
         refreshRecord(saved.id);
         setSaveStatus({ ok: true, msg: `✓ Saved "${saved.name}"` });
         setTimeout(() => setSaveStatus(null), 3000);
+        void versionNote; // unused now; kept for API compat
         return saved;
       } catch (e) {
         setSaveStatus({ ok: false, msg: `✗ ${(e as Error).message}` });
@@ -582,7 +619,7 @@ export function useEditorState() {
         return null;
       }
     },
-    [code, botName, currentBotId, editorLanguage, refreshBots, refreshRecord],
+    [code, botName, currentBotId, editorLanguage, isAuthenticated, refreshBots, refreshRecord],
   );
 
   // Ctrl+S
@@ -617,9 +654,15 @@ export function useEditorState() {
   // ── Delete bot ──────────────────────────────────────────────────
 
   const handleDelete = useCallback(
-    (id: string) => {
-      deleteBotById(id);
-      refreshBots();
+    async (id: string) => {
+      try {
+        await deleteApiBot(id);
+      } catch (e) {
+        setSaveStatus({ ok: false, msg: `✗ Delete failed: ${(e as Error).message}` });
+        setTimeout(() => setSaveStatus(null), 4000);
+        return;
+      }
+      await refreshBots();
       setShowDeleteConfirm(null);
       setShowBotDropdown(false);
       if (currentBotId === id) {
@@ -688,7 +731,6 @@ export function useEditorState() {
         await bot.initFromCode(currentCode);
         addLog(makeLog('success', '✓ Python compiled successfully'));
 
-        // Basic functional validation
         const mockState = {
           tick: 0,
           maxTicks: 15000,
@@ -709,7 +751,6 @@ export function useEditorState() {
           throw new Error('tick() must return a valid command object');
         }
         addLog(makeLog('success', `✓ tick() → { type: '${cmd.type}'${cmd.type === 'move' && cmd.target ? `, target: {x: ${cmd.target.x}, y: ${cmd.target.y}}` : ''} }`));
-
         bot.destroy();
       } catch (e) {
         addLog(makeLog('error', `Python error: ${(e as Error).message}`));
@@ -722,8 +763,6 @@ export function useEditorState() {
         const bot = new KotlinSandboxedBot('test');
         await bot.initFromCode(currentCode);
         addLog(makeLog('success', '✓ Kotlin compiled successfully'));
-
-        // Basic functional validation
         const mockState = {
           tick: 0,
           islands: [{ x: 500, y: 500, owner: 'neutral' }],
@@ -738,7 +777,6 @@ export function useEditorState() {
           throw new Error('tick() must return a valid command object');
         }
         addLog(makeLog('success', `✓ tick() → { type: '${cmd.type}' }`));
-
         bot.destroy();
       } catch (e) {
         addLog(makeLog('error', `Kotlin error: ${(e as Error).message}`));
@@ -785,54 +823,42 @@ export function useEditorState() {
   // ── Restore version ─────────────────────────────────────────────
 
   const handleRestore = useCallback(
-    (versionCode: string) => {
-      const currentCode = editorRef.current?.getValue() ?? code;
-      if (currentBotId) {
-        addBotVersion(currentBotId, currentCode, 'Before restore');
-      }
+    async (versionCode: string) => {
       setCode(versionCode);
       editorRef.current?.setValue(versionCode);
       setIsDirty(true);
-      setTimeout(() => {
-        const id = currentBotId ?? uuid();
-        const saved = saveOrUpdateBot(id, botName.trim(), versionCode, 'Restored version');
-        setCurrentBotId(saved.id);
-        setVersions(saved.versions ?? []);
-        setIsDirty(false);
-        setLastEditedBotId(saved.id);
-        refreshBots();
-        setSaveStatus({ ok: true, msg: '↩ Version restored' });
-        setTimeout(() => setSaveStatus(null), 3000);
-      }, 50);
-      addLog(makeLog('info', '↩ Version restored'));
+      addLog(makeLog('info', '↩ Version restored — save to persist'));
     },
-    [code, currentBotId, botName, refreshBots, addLog],
+    [addLog],
   );
 
   // ── Use in Battle ───────────────────────────────────────────────
 
-  const handleUseInBattle = useCallback(() => {
+  const handleUseInBattle = useCallback(async () => {
     const currentCode = editorRef.current?.getValue() ?? code;
     let savedId = currentBotId;
-    if (botName.trim()) {
-      const id = currentBotId ?? uuid();
-      const saved = saveOrUpdateBot(
-        id,
-        botName.trim(),
-        currentCode,
-        'Before battle',
-        editorLanguage,
-      );
-      savedId = saved.id;
-      setCurrentBotId(saved.id);
-      setVersions(saved.versions ?? []);
-      setIsDirty(false);
-      setLastEditedBotId(saved.id);
-      refreshBots();
+
+    if (isAuthenticated && botName.trim()) {
+      const saved = await saveApiBot({
+        id: currentBotId ?? undefined,
+        name: botName.trim(),
+        code: currentCode,
+        language: editorLanguage as import('@/lib/api/bots').BotLanguage,
+      }).catch(() => null);
+
+      if (saved) {
+        savedId = saved.id;
+        setCurrentBotId(saved.id);
+        setVersions([]);
+        setIsDirty(false);
+        setLastEditedBotId(saved.id);
+        await refreshBots();
+      }
     }
+
     updatePlayer1({ type: 'custom', code: currentCode, savedBotId: savedId ?? undefined });
     router.push(ROUTES.play);
-  }, [code, currentBotId, botName, editorLanguage, refreshBots, updatePlayer1, router]);
+  }, [code, currentBotId, botName, editorLanguage, isAuthenticated, refreshBots, updatePlayer1, router]);
 
   // ── LLM copy ────────────────────────────────────────────────────
 
@@ -880,6 +906,8 @@ export function useEditorState() {
     // Refs
     editorRef,
     monacoRef,
+    // Auth
+    isAuthenticated,
     // State
     code,
     botName,

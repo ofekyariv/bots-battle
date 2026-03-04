@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
-import { getBotById, getBotRecord } from '@/lib/storage';
+import { getBot } from '@/lib/api/bots';
+import { getBotRecord } from '@/lib/storage';
 import type { BotSelectorProps } from './types';
-import type { BotLanguage } from '@/lib/storage';
+import type { BotLanguage } from '@/lib/api/bots';
 
 // ── Language badge helpers ────────────────────────────────────────
 
@@ -57,7 +58,6 @@ export function BotSelector({
   useEffect(() => {
     if (!showBotDropdown) return;
     const handler = (e: MouseEvent) => {
-      // Don't close if clicking inside the dropdown container
       const target = e.target as HTMLElement;
       if (target.closest('[data-bot-dropdown]')) return;
       setShowBotDropdown(false);
@@ -122,11 +122,15 @@ export function BotSelector({
                 >
                   <button
                     className="flex-1 text-left"
-                    onClick={() => {
+                    onClick={async () => {
                       if (isDirty && !confirm('Unsaved changes will be lost. Continue?')) return;
-                      const full = getBotById(bot.id);
-                      if (full) onLoad(full);
-                      setShowBotDropdown(false);
+                      try {
+                        const full = await getBot(bot.id);
+                        onLoad(full);
+                        setShowBotDropdown(false);
+                      } catch {
+                        // Bot fetch failed — ignore
+                      }
                     }}
                   >
                     <span
@@ -142,7 +146,7 @@ export function BotSelector({
                       )}
                     </span>
                     <span className="text-xs block" style={{ color: '#475569' }}>
-                      {new Date(bot.updatedAt).toLocaleString(undefined, {
+                      {new Date(bot.updated_at).toLocaleString(undefined, {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',

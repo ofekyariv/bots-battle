@@ -8,8 +8,10 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { listBots, getBotById, getBotRecord, getBotStyle } from '@/lib/storage';
-import type { BotMeta, BotStyle } from '@/lib/storage';
+import { listBots } from '@/lib/api/bots';
+import type { BotMeta } from '@/lib/api/bots';
+import { getBotRecord, getBotStyle } from '@/lib/storage';
+import type { BotStyle } from '@/lib/storage';
 import { ROUTES } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 
@@ -133,17 +135,23 @@ interface CampaignFleetProps {
 }
 
 export function CampaignFleet({ selectedBotId, onSelect }: CampaignFleetProps) {
-  const [bots, setBots] = useState<BotMeta[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return listBots();
-  });
+  const [bots, setBots] = useState<BotMeta[]>([]);
   const didAutoSelect = useRef(false);
+
+  const refreshBots = () => {
+    listBots()
+      .then((data) => setBots(data))
+      .catch(() => setBots([]));
+  };
+
+  useEffect(() => {
+    refreshBots();
+  }, []);
 
   // Re-read on focus (user might save a new bot in editor and come back)
   useEffect(() => {
-    const refresh = () => setBots(listBots());
-    window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
+    window.addEventListener('focus', refreshBots);
+    return () => window.removeEventListener('focus', refreshBots);
   }, []);
 
   // Auto-select: restore persisted or pick first

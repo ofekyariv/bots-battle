@@ -2,7 +2,7 @@
 // Shared types for the Editor components
 // ─────────────────────────────────────────────
 
-import type { BotMeta, BotVersion, SavedBot } from '@/lib/storage';
+import type { BotMeta, BotWithCode } from '@/lib/api/bots';
 
 export type LogLevel = 'info' | 'success' | 'error' | 'warn';
 
@@ -24,6 +24,13 @@ export interface WinRecord {
   total: number;
 }
 
+/** Lightweight version history entry (stored client-side only for the current session) */
+export interface BotVersion {
+  code: string;
+  savedAt: string;
+  note?: string;
+}
+
 // ── Component prop types ──────────────────────────────────────────
 
 export interface ConsoleOutputProps {
@@ -42,7 +49,7 @@ export interface BotSelectorProps {
   showDeleteConfirm: string | null;
   setShowDeleteConfirm: (id: string | null) => void;
   onNew: () => void;
-  onLoad: (bot: SavedBot) => void;
+  onLoad: (bot: BotWithCode) => void;
   onDelete: (id: string) => void;
 }
 
@@ -78,12 +85,13 @@ export interface EditorToolbarProps {
   editorLanguage: EditorLanguage;
   onLanguageChange: (lang: EditorLanguage) => void;
   onNew: () => void;
-  onLoad: (bot: SavedBot) => void;
+  onLoad: (bot: BotWithCode) => void;
   onDelete: (id: string) => void;
   onSave: () => void;
   onRunTest: () => void;
   onCopyForLLM: () => void;
+  isAuthenticated: boolean;
 }
 
-// Re-export storage types for convenience
-export type { BotMeta, BotVersion, SavedBot };
+// Re-export API types for convenience
+export type { BotMeta, BotWithCode };

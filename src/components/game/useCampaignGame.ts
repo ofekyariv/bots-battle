@@ -18,7 +18,7 @@ import {
   CAMPAIGN_LEVELS,
   type CampaignPending,
 } from '@/lib/campaign';
-import { getBotById } from '@/lib/storage';
+import { getBot } from '@/lib/api/bots';
 import { getCampaignSelectedBot } from '@/components/campaign/BotSelectionModal';
 
 export interface CampaignGameState {
@@ -87,11 +87,11 @@ export function useCampaignGame(
           // More bots left in this level — launch next challenge directly
           const nextBot = levelDef.bots[nextBotIndex];
           setCampaignContinueLabel(`⚔️ Next: vs ${nextBot?.name ?? 'Next Bot'}`);
-          setCampaignContinueFn(() => () => {
+          setCampaignContinueFn(() => async () => {
             // Set up the next challenge inline if we have game context
             if (gameCtx && bumpGameKey) {
               const savedBotId = getCampaignSelectedBot();
-              const savedBot = savedBotId ? getBotById(savedBotId) : null;
+              const savedBot = savedBotId ? await getBot(savedBotId).catch(() => null) : null;
               if (savedBot) {
                 const cfg = getLevelConfig(levelDef);
                 gameCtx.updatePlayer1({ type: 'custom', code: savedBot.code, savedBotId: savedBot.id });

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { db } from '@/db';
 import { bots } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, count } from 'drizzle-orm';
 
 const BOT_LANGUAGES = ['javascript', 'typescript', 'python', 'kotlin', 'java', 'csharp', 'swift'] as const;
 const MAX_CODE_BYTES = 50 * 1024; // 50KB
@@ -55,6 +55,19 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, language, code } = parsed.data;
+
+  // Enforce 10-bot limit
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(bots)
+    .where(and(eq(bots.userId, session.user.id), eq(bots.isActive, true)));
+
+  if (total >= 10) {
+    return NextResponse.json(
+      { error: 'Bot limit reached. You can have at most 10 active bots.' },
+      { status: 422 },
+    );
+  }
 
   const [created] = await db
     .insert(bots)

@@ -11,10 +11,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { BOT_REGISTRY } from '@/bots/index';
 import type { BotRegistryEntry } from '@/bots/index';
-import { getPlayerRecordVsOpponent, listBots, getBotById } from '@/lib/storage';
+import { getPlayerRecordVsOpponent } from '@/lib/storage';
+import { listBots, getBot } from '@/lib/api/bots';
+import type { BotMeta } from '@/lib/api/bots';
 import { getUnlockedBotIds } from '@/lib/campaign';
 import type { BotSource } from '@/lib/GameContext';
-import type { BotMeta } from '@/lib/storage';
 
 // ─────────────────────────────────────────────
 // Difficulty config
@@ -138,13 +139,18 @@ export default function OpponentGrid({ source, onChange, onScout }: OpponentGrid
   const [myBots, setMyBots] = useState<BotMeta[]>([]);
 
   useEffect(() => {
-    setMyBots(listBots());
+    listBots()
+      .then((data) => setMyBots(data))
+      .catch(() => setMyBots([]));
   }, []);
 
-  const handleSelectMyBot = (bot: BotMeta) => {
-    const full = getBotById(bot.id);
-    if (!full) return;
-    onChange({ type: 'custom', code: full.code, savedBotId: bot.id });
+  const handleSelectMyBot = async (bot: BotMeta) => {
+    try {
+      const full = await getBot(bot.id);
+      onChange({ type: 'custom', code: full.code, savedBotId: bot.id });
+    } catch {
+      // ignore
+    }
   };
 
   const unlockedIds = useMemo(() => getUnlockedBotIds(), []);

@@ -1,15 +1,17 @@
 // ============================================================
 // 🏴‍☠️ FleetGrid — Player 1 "My Fleet" bot selection
 // ============================================================
-// Shows saved custom bots + a "Starter Bot" fallback when empty.
+// Shows saved custom bots (from server DB) + a "Starter Bot" fallback.
 // Always has exactly one bot selected. Persists last selection.
 // ============================================================
 
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { listBots, getBotById, getBotRecord, getBotStyle, saveLastPlayer1, loadLastPlayer1 } from '@/lib/storage';
-import type { BotMeta, BotStyle } from '@/lib/storage';
+import { listBots, getBot } from '@/lib/api/bots';
+import type { BotMeta } from '@/lib/api/bots';
+import { getBotRecord, getBotStyle, saveLastPlayer1, loadLastPlayer1 } from '@/lib/storage';
+import type { BotStyle } from '@/lib/storage';
 import type { BotSource } from '@/lib/GameContext';
 import { BOT_REGISTRY } from '@/bots/index';
 import { ROUTES } from '@/lib/routes';
@@ -45,8 +47,10 @@ const STARTER_BOT: BotMeta = {
   id: STARTER_BOT_ID,
   name: 'Starter Bot',
   language: 'javascript',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  is_active: true,
+  version: 1,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
 };
 
 // ─────────────────────────────────────────────
@@ -68,7 +72,7 @@ function BotCard({ bot, isSelected, isStarter, onSelect }: BotCardProps) {
   const winRate = record.total > 0 ? Math.round((record.wins / record.total) * 100) : null;
 
   // Format last played date
-  const lastPlayed = new Date(bot.updatedAt);
+  const lastPlayed = new Date(bot.updated_at);
   const now = new Date();
   const diffMs = now.getTime() - lastPlayed.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -166,54 +170,78 @@ interface FleetGridProps {
 }
 
 export default function FleetGrid({ source, onChange, className }: FleetGridProps) {
-  // Initialize bots eagerly from localStorage (avoids empty-then-populate race)
-  const [bots, setBots] = useState<BotMeta[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return listBots();
-  });
+  const [bots, setBots] = useState<BotMeta[]>([]);
+  const [loading, setLoading] = useState(true);
   const didAutoSelect = useRef(false);
 
-  // Re-read bots from localStorage on focus
-  const refreshBots = () => setBots(listBots());
+  const refreshBots = async () => {
+    try {
+      const data = await listBots();
+      setBots(data);
+      return data;
+    } catch {
+      setBots([]);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Load bots on mount
   useEffect(() => {
-    window.addEventListener('focus', refreshBots);
-    return () => window.removeEventListener('focus', refreshBots);
+    refreshBots();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-read bots on focus (user might have saved in editor)
+  useEffect(() => {
+    const handler = () => refreshBots();
+    window.addEventListener('focus', handler);
+    return () => window.removeEventListener('focus', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-select: restore last selection or pick first bot
   useEffect(() => {
-    if (didAutoSelect.current) return;
+    if (loading || didAutoSelect.current) return;
     didAutoSelect.current = true;
 
     const lastId = loadLastPlayer1();
     const hasCustomBots = bots.length > 0;
 
-    if (hasCustomBots) {
-      // Try to restore last selection
-      if (lastId && lastId !== STARTER_BOT_ID) {
-        const full = getBotById(lastId);
-        if (full) {
-          onChange({ type: 'custom', code: full.code, savedBotId: lastId });
-          return;
+    const doAutoSelect = async () => {
+      if (hasCustomBots) {
+        // Try to restore last selection
+        if (lastId && lastId !== STARTER_BOT_ID) {
+          try {
+            const full = await getBot(lastId);
+            onChange({ type: 'custom', code: full.code, savedBotId: lastId });
+            return;
+          } catch {
+            // Bot not found — fall through to first bot
+          }
+        }
+        // Fall back to first bot
+        try {
+          const full = await getBot(bots[0].id);
+          onChange({ type: 'custom', code: full.code, savedBotId: bots[0].id });
+          saveLastPlayer1(bots[0].id);
+        } catch {
+          // ignore
+        }
+      } else {
+        // No custom bots — use the "balanced" preset as starter
+        const balancedBot = BOT_REGISTRY.find((b) => b.id === 'balanced');
+        if (balancedBot) {
+          onChange({ type: 'preset', id: 'balanced' });
+          saveLastPlayer1(STARTER_BOT_ID);
         }
       }
-      // Fall back to first bot
-      const first = getBotById(bots[0].id);
-      if (first) {
-        onChange({ type: 'custom', code: first.code, savedBotId: bots[0].id });
-        saveLastPlayer1(bots[0].id);
-      }
-    } else {
-      // No custom bots — use the "balanced" preset as starter
-      const balancedBot = BOT_REGISTRY.find((b) => b.id === 'balanced');
-      if (balancedBot) {
-        onChange({ type: 'preset', id: 'balanced' });
-        saveLastPlayer1(STARTER_BOT_ID);
-      }
-    }
+    };
+
+    doAutoSelect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bots]);
+  }, [loading, bots]);
 
   // Currently selected bot id
   const selectedId =
@@ -223,17 +251,20 @@ export default function FleetGrid({ source, onChange, className }: FleetGridProp
         ? STARTER_BOT_ID
         : null;
 
-  const handleSelect = (bot: BotMeta) => {
-    if (bot.id === STARTER_BOT_ID) {
+  const handleSelect = async (bot: BotMeta & { isStarter?: boolean }) => {
+    if (bot.id === STARTER_BOT_ID || bot.isStarter) {
       // Starter bot = balanced preset
       onChange({ type: 'preset', id: 'balanced' });
       saveLastPlayer1(STARTER_BOT_ID);
       return;
     }
-    const full = getBotById(bot.id);
-    if (!full) return;
-    onChange({ type: 'custom', code: full.code, savedBotId: bot.id });
-    saveLastPlayer1(bot.id);
+    try {
+      const full = await getBot(bot.id);
+      onChange({ type: 'custom', code: full.code, savedBotId: bot.id });
+      saveLastPlayer1(bot.id);
+    } catch {
+      // ignore
+    }
   };
 
   const hasCustomBots = bots.length > 0;
@@ -265,19 +296,23 @@ export default function FleetGrid({ source, onChange, className }: FleetGridProp
       </div>
 
       {/* Bot grid */}
-      <div className="grid grid-cols-2 gap-2 p-1 -m-1 flex-1 overflow-y-auto scrollbar-thin">
-        {displayBots.map((bot) => (
-          <BotCard
-            key={bot.id}
-            bot={bot}
-            isSelected={selectedId === bot.id}
-            isStarter={'isStarter' in bot && bot.isStarter}
-            onSelect={() => handleSelect(bot)}
-          />
-        ))}
-
-
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-6 text-xs text-slate-500">
+          Loading bots…
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 p-1 -m-1 flex-1 overflow-y-auto scrollbar-thin">
+          {displayBots.map((bot) => (
+            <BotCard
+              key={bot.id}
+              bot={bot}
+              isSelected={selectedId === bot.id}
+              isStarter={'isStarter' in bot && bot.isStarter}
+              onSelect={() => handleSelect(bot)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Selected bot indicator — only show for starter bot */}
       {selectedId === STARTER_BOT_ID && !hasCustomBots && (

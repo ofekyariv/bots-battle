@@ -15,7 +15,7 @@
 
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import { useRef, useState, useEffect } from 'react';
-import { saveBot } from '@/lib/storage';
+import { saveBot as saveApiBot } from '@/lib/api/bots';
 import { isPythonCode } from '@/lib/pythonSandbox';
 import { isKotlinCode } from '@/lib/kotlinSandbox';
 import { isCSharpCode } from '@/lib/csharpSandbox';
@@ -460,7 +460,7 @@ export default function BotEditor({
 
     setSaving(true);
     try {
-      saveBot(name.trim(), code, undefined, language);
+      await saveApiBot({ name: name.trim(), language, code });
       setSaveMsg(`✅ Saved "${name.trim()}"`);
       setTimeout(() => setSaveMsg(null), 3000);
     } catch (err) {
