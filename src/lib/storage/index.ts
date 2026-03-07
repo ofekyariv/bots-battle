@@ -26,10 +26,6 @@ export {
   loadGameSettings,
   saveLastOpponent,
   loadLastOpponent,
-  saveLastPlayer1,
-  loadLastPlayer1,
   saveLastPreset,
   loadLastPreset,
-  setLastEditedBotId,
-  getLastEditedBotId,
 } from './matches';

@@ -14,8 +14,6 @@ import {
 import type { BotMeta, BotWithCode } from '@/lib/api/bots';
 import {
   getBotRecord,
-  setLastEditedBotId,
-  getLastEditedBotId,
 } from '@/lib/storage';
 import { useGameContext } from '@/lib/GameContext';
 import {
@@ -476,7 +474,6 @@ export function useEditorState() {
       setVersions([]); // Version history not returned by server API
       setIsDirty(false);
       setEditorLanguage(lang);
-      setLastEditedBotId(bot.id);
       suppressDirtyRef.current = true;
       editorRef.current?.setValue(bot.code);
       suppressDirtyRef.current = false;
@@ -510,8 +507,7 @@ export function useEditorState() {
       // ?new=1 → start fresh, don't load any bot
       if (params.get('new') === '1') return;
 
-      const lastId = getLastEditedBotId();
-      const loadId = params.get('load') ?? lastId;
+      const loadId = params.get('load');
       if (loadId && isAuthenticated) {
         try {
           const bot = await getBot(loadId);
@@ -606,7 +602,6 @@ export function useEditorState() {
         setCurrentBotId(saved.id);
         setVersions([]);
         setIsDirty(false);
-        setLastEditedBotId(saved.id);
         await refreshBots();
         refreshRecord(saved.id);
         setSaveStatus({ ok: true, msg: `✓ Saved "${saved.name}"` });
@@ -645,7 +640,6 @@ export function useEditorState() {
     setIsDirty(false);
     setEditorLanguage('javascript');
     setRecord({ wins: 0, losses: 0, draws: 0, total: 0 });
-    setLastEditedBotId(null);
     editorRef.current?.setValue(STARTER_BOT_CODE);
     setMonacoLanguage('javascript');
     addLog(makeLog('info', '📄 New bot from starter template'));
@@ -672,7 +666,6 @@ export function useEditorState() {
         setVersions([]);
         setIsDirty(false);
         setEditorLanguage('javascript');
-        setLastEditedBotId(null);
         editorRef.current?.setValue(STARTER_BOT_CODE);
         setMonacoLanguage('javascript');
       }
@@ -851,7 +844,6 @@ export function useEditorState() {
         setCurrentBotId(saved.id);
         setVersions([]);
         setIsDirty(false);
-        setLastEditedBotId(saved.id);
         await refreshBots();
       }
     }

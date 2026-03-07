@@ -17,7 +17,6 @@ const MATCH_RESULTS_KEY = 'bots-battle:match-results';
 const PLAYER_RECORDS_KEY = 'bots-battle:player-records';
 const BOT_STYLES_KEY = 'bots-battle:bot-styles';
 const GAME_SETTINGS_KEY = 'bots-battle:settings';
-const LAST_EDITED_KEY = 'bots-battle:last-edited-bot-id';
 const LAST_OPPONENT_KEY = 'bots-battle:last-opponent';
 
 function isBrowser(): boolean {
@@ -256,26 +255,6 @@ export function loadLastOpponent(): string | null {
 }
 
 // ─────────────────────────────────────────────
-// Last player1 bot persistence
-// ─────────────────────────────────────────────
-
-const LAST_PLAYER1_KEY = 'bots-battle:last-player1';
-
-export function saveLastPlayer1(botId: string): void {
-  if (!isBrowser()) return;
-  try {
-    localStorage.setItem(LAST_PLAYER1_KEY, botId);
-  } catch {
-    // fail silently
-  }
-}
-
-export function loadLastPlayer1(): string | null {
-  if (!isBrowser()) return null;
-  return localStorage.getItem(LAST_PLAYER1_KEY);
-}
-
-// ─────────────────────────────────────────────
 // Last match preset persistence
 // ─────────────────────────────────────────────
 
@@ -293,24 +272,6 @@ export function saveLastPreset(preset: string): void {
 export function loadLastPreset(): string | null {
   if (!isBrowser()) return null;
   return localStorage.getItem(LAST_PRESET_KEY);
-}
-
-// ─────────────────────────────────────────────
-// Last-edited bot persistence
-// ─────────────────────────────────────────────
-
-export function setLastEditedBotId(id: string | null): void {
-  if (!isBrowser()) return;
-  if (id) {
-    localStorage.setItem(LAST_EDITED_KEY, id);
-  } else {
-    localStorage.removeItem(LAST_EDITED_KEY);
-  }
-}
-
-export function getLastEditedBotId(): string | null {
-  if (!isBrowser()) return null;
-  return localStorage.getItem(LAST_EDITED_KEY);
 }
 
 // ─────────────────────────────────────────────

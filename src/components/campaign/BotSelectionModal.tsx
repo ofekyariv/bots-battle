@@ -15,20 +15,6 @@ import type { BotStyle } from '@/lib/storage';
 import { ROUTES } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 
-// ─── Persistence ─────────────────────────────────────────────
-
-const CAMPAIGN_BOT_KEY = 'bots-battle:campaign-selected-bot';
-
-export function getCampaignSelectedBot(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(CAMPAIGN_BOT_KEY);
-}
-
-export function setCampaignSelectedBot(botId: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CAMPAIGN_BOT_KEY, botId);
-}
-
 // ─── Style badge config ──────────────────────────────────────
 
 const STYLE_CONFIG: Record<BotStyle, { label: string; emoji: string; classes: string }> = {
@@ -154,24 +140,16 @@ export function CampaignFleet({ selectedBotId, onSelect }: CampaignFleetProps) {
     return () => window.removeEventListener('focus', refreshBots);
   }, []);
 
-  // Auto-select: restore persisted or pick first
+  // Auto-select: pick first bot
   useEffect(() => {
     if (didAutoSelect.current || bots.length === 0) return;
     didAutoSelect.current = true;
-
-    const saved = getCampaignSelectedBot();
-    if (saved && bots.some((b) => b.id === saved)) {
-      onSelect(saved);
-    } else {
-      onSelect(bots[0].id);
-      setCampaignSelectedBot(bots[0].id);
-    }
+    onSelect(bots[0].id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bots]);
 
   const handleSelect = (botId: string) => {
     onSelect(botId);
-    setCampaignSelectedBot(botId);
   };
 
   const hasCustomBots = bots.length > 0;

@@ -19,7 +19,6 @@ import {
   type CampaignPending,
 } from '@/lib/campaign';
 import { getBot } from '@/lib/api/bots';
-import { getCampaignSelectedBot } from '@/components/campaign/BotSelectionModal';
 
 export interface CampaignGameState {
   campaignPending: CampaignPending | null;
@@ -43,6 +42,7 @@ export function useCampaignGame(
   setReady: (v: boolean) => void,
   gameCtx?: GameContextActions,
   bumpGameKey?: () => void,
+  player1Source?: BotSource,
 ): CampaignGameState {
   const router = useRouter();
 
@@ -90,7 +90,11 @@ export function useCampaignGame(
           setCampaignContinueFn(() => async () => {
             // Set up the next challenge inline if we have game context
             if (gameCtx && bumpGameKey) {
-              const savedBotId = getCampaignSelectedBot();
+              // Use the player1 bot source that was set when the campaign started
+              const savedBotId =
+                player1Source?.type === 'custom'
+                  ? (player1Source as { type: 'custom'; code: string; savedBotId?: string }).savedBotId ?? null
+                  : null;
               const savedBot = savedBotId ? await getBot(savedBotId).catch(() => null) : null;
               if (savedBot) {
                 const cfg = getLevelConfig(levelDef);

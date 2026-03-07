@@ -34,7 +34,7 @@ export default function GamePage() {
     campaignContinueFn,
     handleCampaignResult,
     resetCampaignForRematch,
-  } = useCampaignGame(setReady, { updatePlayer1, updatePlayer2, updateConfig }, bumpGameKey);
+  } = useCampaignGame(setReady, { updatePlayer1, updatePlayer2, updateConfig }, bumpGameKey, setup.player1.botSource);
   const [currentOpponentId, setCurrentOpponentId] = useState<string>(() =>
     setup.player2.botSource.type === 'preset' ? setup.player2.botSource.id : '',
   );

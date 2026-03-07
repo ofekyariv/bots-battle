@@ -16,7 +16,8 @@ import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { GameResult } from '@/engine/types';
 import type { GameEvent, GameStats } from '@/lib/useGame';
-import { SectionHeader, Separator, Dialog, DialogContent } from '@/components/ui';
+import { VisuallyHidden } from 'radix-ui';
+import { SectionHeader, Separator, Dialog, DialogContent, DialogTitle } from '@/components/ui';
 
 // ─────────────────────────────────────────────
 // Types
@@ -699,6 +700,10 @@ export default function GameOverModal({
         showCloseButton={false}
         className="!inset-0 !translate-x-0 !translate-y-0 !m-auto !h-fit w-[calc(100%-2rem)] max-w-3xl landscape:max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 landscape:p-4 flex flex-col gap-3 landscape:gap-2 outline-none bg-[rgba(5,12,30,0.97)] border-[#92741a] [box-shadow:0_0_60px_rgba(212,175,55,0.2),0_24px_64px_rgba(0,0,0,0.8)]"
       >
+        <VisuallyHidden.Root asChild>
+          <DialogTitle>Game Over</DialogTitle>
+        </VisuallyHidden.Root>
+
         {/* ── Corner decorations ── */}
         <div className="absolute top-0 left-0 w-16 h-16 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(212,175,55,0.12),transparent_70%)] rounded-[inherit]" />
         <div className="absolute bottom-0 right-0 w-16 h-16 pointer-events-none bg-[radial-gradient(circle_at_bottom_right,rgba(212,175,55,0.08),transparent_70%)] rounded-[inherit]" />

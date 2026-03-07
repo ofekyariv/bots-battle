@@ -13,7 +13,7 @@ export default async function AuthButton() {
             alt={session.user.name ?? 'User avatar'}
             width={28}
             height={28}
-            className="rounded-full border border-gold/40"
+            className="rounded-full border border-gold/40 overflow-hidden flex-shrink-0"
           />
         )}
         <span className="text-sm text-gold/80 hidden lg:block font-medium">
@@ -27,10 +27,11 @@ export default async function AuthButton() {
         >
           <button
             type="submit"
-            className="ml-1 px-3 py-1 rounded text-xs text-slate-400 hover:text-white
+            className="ml-1 px-2 sm:px-3 py-1 rounded text-xs text-slate-400 hover:text-white
               hover:bg-white/10 transition-colors border border-white/10"
           >
-            Sign Out
+            <span className="sm:hidden">✕</span>
+            <span className="hidden sm:inline">Sign Out</span>
           </button>
         </form>
       </div>
@@ -46,11 +47,12 @@ export default async function AuthButton() {
     >
       <button
         type="submit"
-        className="px-4 py-1.5 rounded-md text-sm font-bold transition-all hover:scale-105
+        className="px-2 sm:px-4 py-1.5 rounded-md text-sm font-bold transition-all hover:scale-105
           bg-transparent border border-gold/50 text-gold hover:bg-gold/10
           shadow-[0_0_8px_rgba(212,168,67,0.15)]"
       >
-        ⚓ Sign In
+        <span className="sm:hidden">⚓</span>
+        <span className="hidden sm:inline">⚓ Sign In</span>
       </button>
     </form>
   );

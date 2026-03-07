@@ -3,10 +3,40 @@ import './globals.css';
 import ClientProviders from '@/components/ClientProviders';
 import Navbar from '@/components/nav/Navbar';
 
+const BASE_URL = 'https://bots-battle.vercel.app';
+const OG_IMAGE = `${BASE_URL}/api/og`;
+
 export const metadata: Metadata = {
-  title: 'Bots Battle',
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: 'Bots Battle — Code Your Fleet, Conquer the Seas',
+    template: '%s | Bots Battle',
+  },
   description:
-    'A web-based strategy coding game. Write JavaScript algorithms that control pirate ships. Your code IS your strategy.',
+    'A strategy coding game where you program pirate ship algorithms in JavaScript, TypeScript, Python, Kotlin, Java, C#, and Swift. Your code IS your strategy.',
+  openGraph: {
+    title: 'Bots Battle — Code Your Fleet, Conquer the Seas',
+    description:
+      'A strategy coding game where you program pirate ship algorithms in JavaScript, TypeScript, Python, Kotlin, Java, C#, and Swift. Your code IS your strategy.',
+    url: BASE_URL,
+    siteName: 'Bots Battle',
+    images: [
+      {
+        url: OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: 'Bots Battle — Code Your Fleet, Conquer the Seas',
+      },
+    ],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Bots Battle — Code Your Fleet, Conquer the Seas',
+    description:
+      'A strategy coding game where you program pirate ship algorithms in JavaScript, TypeScript, Python, Kotlin, Java, C#, and Swift. Your code IS your strategy.',
+    images: [OG_IMAGE],
+  },
 };
 
 export const viewport: Viewport = {

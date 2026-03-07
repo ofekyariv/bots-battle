@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 
 import { LevelCard } from '@/components/campaign/LevelCard';
 import { CampaignProgress } from '@/components/campaign/CampaignProgress';
-import { CampaignFleet, getCampaignSelectedBot, setCampaignSelectedBot } from '@/components/campaign/BotSelectionModal';
+import { CampaignFleet } from '@/components/campaign/BotSelectionModal';
 import { VictoryFlash } from '@/components/campaign/VictoryFlash';
 
 // ─── Main Page ───────────────────────────────────────────────
@@ -103,7 +103,6 @@ export default function CampaignPage() {
 
   const handleBotSelect = useCallback((botId: string) => {
     setPlayerBotId(botId);
-    setCampaignSelectedBot(botId);
     listBots()
       .then((data) => setCustomBots(data))
       .catch(() => {});

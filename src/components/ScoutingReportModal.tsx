@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 import { BOT_REGISTRY } from '@/bots/index';
 import type { BotRegistryEntry } from '@/bots/index';
 import { getPlayerRecordVsOpponent } from '@/lib/storage';
-import { Dialog, DialogContent, DialogClose, Badge, Separator } from '@/components/ui';
+import { Dialog, DialogContent, DialogClose, DialogTitle, Badge, Separator } from '@/components/ui';
 
 // ─────────────────────────────────────────────
 // Counter suggestions per bot
@@ -122,7 +122,7 @@ export default function ScoutingReportModal({ botId, onClose }: ScoutingReportMo
             <div className="flex items-start gap-4 pr-8">
               <span className="text-4xl">🔍</span>
               <div className="flex flex-col gap-1">
-                <h2 className="text-xl font-black text-[#f5a623]">Scouting Report</h2>
+                <DialogTitle className="text-xl font-black text-[#f5a623]">Scouting Report</DialogTitle>
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold text-slate-200">{bot.name}</span>
                   <Badge variant="outline" className={`font-bold uppercase ${badgeClasses}`}>

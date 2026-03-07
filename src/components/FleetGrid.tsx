@@ -10,7 +10,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { listBots, getBot } from '@/lib/api/bots';
 import type { BotMeta } from '@/lib/api/bots';
-import { getBotRecord, getBotStyle, saveLastPlayer1, loadLastPlayer1 } from '@/lib/storage';
+import { getBotRecord, getBotStyle } from '@/lib/storage';
 import type { BotStyle } from '@/lib/storage';
 import type { BotSource } from '@/lib/GameContext';
 import { BOT_REGISTRY } from '@/bots/index';
@@ -201,31 +201,19 @@ export default function FleetGrid({ source, onChange, className }: FleetGridProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-select: restore last selection or pick first bot
+  // Auto-select: pick first bot (no localStorage restoration)
   useEffect(() => {
     if (loading || didAutoSelect.current) return;
     didAutoSelect.current = true;
 
-    const lastId = loadLastPlayer1();
     const hasCustomBots = bots.length > 0;
 
     const doAutoSelect = async () => {
       if (hasCustomBots) {
-        // Try to restore last selection
-        if (lastId && lastId !== STARTER_BOT_ID) {
-          try {
-            const full = await getBot(lastId);
-            onChange({ type: 'custom', code: full.code, savedBotId: lastId });
-            return;
-          } catch {
-            // Bot not found — fall through to first bot
-          }
-        }
-        // Fall back to first bot
+        // Select first bot by default
         try {
           const full = await getBot(bots[0].id);
           onChange({ type: 'custom', code: full.code, savedBotId: bots[0].id });
-          saveLastPlayer1(bots[0].id);
         } catch {
           // ignore
         }
@@ -234,7 +222,6 @@ export default function FleetGrid({ source, onChange, className }: FleetGridProp
         const balancedBot = BOT_REGISTRY.find((b) => b.id === 'balanced');
         if (balancedBot) {
           onChange({ type: 'preset', id: 'balanced' });
-          saveLastPlayer1(STARTER_BOT_ID);
         }
       }
     };
@@ -255,13 +242,11 @@ export default function FleetGrid({ source, onChange, className }: FleetGridProp
     if (bot.id === STARTER_BOT_ID || bot.isStarter) {
       // Starter bot = balanced preset
       onChange({ type: 'preset', id: 'balanced' });
-      saveLastPlayer1(STARTER_BOT_ID);
       return;
     }
     try {
       const full = await getBot(bot.id);
       onChange({ type: 'custom', code: full.code, savedBotId: bot.id });
-      saveLastPlayer1(bot.id);
     } catch {
       // ignore
     }
