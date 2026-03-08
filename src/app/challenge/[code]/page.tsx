@@ -59,12 +59,18 @@ export default function ChallengePage() {
   useEffect(() => {
     if (!session?.user) return;
     fetch('/api/bots')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: BotOption[]) => {
+        if (!Array.isArray(data)) throw new Error('Unexpected response');
         setMyBots(data);
         if (data.length > 0) setSelectedBotId(data[0].id);
       })
-      .catch(() => {});
+      .catch(() => {
+        setMyBots([]);
+      });
   }, [session]);
 
   async function acceptChallenge() {

@@ -28,11 +28,15 @@ export default function ChallengeButton() {
     setBotsLoading(true);
     try {
       const res = await fetch('/api/bots');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
       const data: BotOption[] = await res.json();
       setBots(data);
       if (data.length > 0) setSelectedBotId(data[0].id);
-    } catch {
-      setError('Failed to load your bots');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load your bots');
     } finally {
       setBotsLoading(false);
     }
@@ -94,6 +98,17 @@ export default function ChallengeButton() {
 
             {botsLoading ? (
               <p className="text-gold/60 animate-pulse text-sm">Loading your bots...</p>
+            ) : error && bots.length === 0 ? (
+              /* API error — show it directly instead of the misleading "create a bot" message */
+              <div className="space-y-3">
+                <p className="text-red-400 text-sm">{error}</p>
+                <button
+                  onClick={openModal}
+                  className="w-full py-2 rounded-lg border border-gold/30 text-gold text-sm hover:bg-gold/10 transition-colors"
+                >
+                  🔄 Retry
+                </button>
+              </div>
             ) : bots.length === 0 ? (
               <p className="text-slate-400 text-sm">You need to create a bot first.</p>
             ) : !inviteUrl ? (
