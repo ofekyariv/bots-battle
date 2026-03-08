@@ -4,6 +4,8 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
+export const maxDuration = 60;
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { db } from '@/db';

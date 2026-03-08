@@ -519,6 +519,7 @@ export default function ReplayViewerPage() {
           mapWidth={currentFrame.config.mapWidth}
           mapHeight={currentFrame.config.mapHeight}
           showIslandIds
+          disableInterpolation
         />
       </div>
 

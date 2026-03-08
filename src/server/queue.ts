@@ -1,9 +1,9 @@
 // ============================================================
-// 🏴☠️ Bots Battle — Match Queue (BullMQ + Redis)
+// 🏴☠️ Bots Battle — Match Executor (Synchronous)
 // ============================================================
 //
-// Falls back to an in-memory queue when REDIS_URL is not set
-// (local dev without Redis).
+// Synchronous match execution for Vercel serverless.
+// Matches run immediately in the same request — no queue needed.
 // ============================================================
 
 import { db } from '@/db';
@@ -11,22 +11,6 @@ import { matches, bots } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { runMatch } from './match-runner';
 import { updateRatingsAfterMatch } from '@/lib/elo';
-
-// ─────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────
-
-interface MatchJobData {
-  matchId: string;
-}
-
-// ─────────────────────────────────────────────
-// Queue implementation
-// ─────────────────────────────────────────────
-
-type QueueAdapter = {
-  add: (matchId: string) => Promise<void>;
-};
 
 // ─────────────────────────────────────────────
 // Core match processor
@@ -82,100 +66,23 @@ async function processMatch(matchId: string): Promise<void> {
 }
 
 // ─────────────────────────────────────────────
-// BullMQ queue (Redis-backed)
+// Public API — synchronous match execution
 // ─────────────────────────────────────────────
-
-function createBullMQQueue(): QueueAdapter {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const bullmq = require('bullmq') as typeof import('bullmq');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-  const IORedisLib = require('ioredis') as { default: new (...args: any[]) => any };
-
-  const connection = new IORedisLib.default(process.env.REDIS_URL!, {
-    maxRetriesPerRequest: null,
-  });
-
-  const queue = new bullmq.Queue<MatchJobData>('matches', { connection });
-
-  // Worker — runs in the same process for simplicity
-  // In production you'd run this in a separate worker process
-  new bullmq.Worker<MatchJobData>(
-    'matches',
-    async (job) => {
-      await processMatch(job.data.matchId);
-    },
-    {
-      connection,
-      concurrency: 3,
-    },
-  );
-
-  return {
-    add: async (matchId: string) => {
-      await queue.add('run-match', { matchId }, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: 100,
-        removeOnFail: 50,
-      });
-    },
-  };
-}
-
-// ─────────────────────────────────────────────
-// In-memory fallback queue (local dev)
-// ─────────────────────────────────────────────
-
-function createInMemoryQueue(): QueueAdapter {
-  const pending: string[] = [];
-  let running = false;
-
-  async function drain() {
-    if (running) return;
-    running = true;
-    while (pending.length > 0) {
-      const matchId = pending.shift()!;
-      try {
-        await processMatch(matchId);
-      } catch (err) {
-        console.error(`[in-memory queue] Match ${matchId} failed:`, err);
-        // Mark errored
-        await db.update(matches).set({ status: 'errored' }).where(eq(matches.id, matchId)).catch(() => {});
-      }
-    }
-    running = false;
-  }
-
-  return {
-    add: async (matchId: string) => {
-      pending.push(matchId);
-      // Run async — don't block the HTTP response
-      setImmediate(() => drain().catch(console.error));
-    },
-  };
-}
-
-// ─────────────────────────────────────────────
-// Singleton queue instance
-// ─────────────────────────────────────────────
-
-let _queue: QueueAdapter | null = null;
-
-export function getQueue(): QueueAdapter {
-  if (_queue) return _queue;
-  if (process.env.REDIS_URL) {
-    console.log('[queue] Using BullMQ + Redis');
-    _queue = createBullMQQueue();
-  } else {
-    console.warn('[queue] REDIS_URL not set — using in-memory queue (local dev only)');
-    _queue = createInMemoryQueue();
-  }
-  return _queue;
-}
 
 /**
- * Enqueue a match for execution.
+ * Execute a match immediately (synchronous — no queue).
+ * On failure, marks the match as 'errored' in the DB and logs the error.
+ * Does NOT throw — safe to call from API routes without crashing the request.
  */
 export async function addMatchJob(matchId: string): Promise<void> {
-  await getQueue().add(matchId);
+  try {
+    await processMatch(matchId);
+  } catch (err) {
+    console.error(`[match-executor] Match ${matchId} failed:`, err);
+    await db
+      .update(matches)
+      .set({ status: 'errored' })
+      .where(eq(matches.id, matchId))
+      .catch((dbErr) => console.error(`[match-executor] Failed to mark match ${matchId} as errored:`, dbErr));
+  }
 }

@@ -21,7 +21,7 @@
 
 'use client';
 
-import { useEffect, useRef, useCallback, memo } from 'react';
+import { useEffect, useLayoutEffect, useRef, useCallback, memo } from 'react';
 import type { FullGameState, Ship, Owner } from '@/engine/types';
 
 // ─────────────────────────────────────────────────────────────
@@ -36,6 +36,12 @@ interface Props {
   mapHeight: number;
   showIslandIds?: boolean;
   cameraMode?: CameraMode;
+  /**
+   * When true, ship positions jump instantly to the current frame without
+   * interpolating from the previous state. Use in replay scrubbing so the
+   * canvas updates immediately instead of animating over tickRateMs ms.
+   */
+  disableInterpolation?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -238,7 +244,7 @@ interface ColorTrans {
 // These are canvas-layer hot paths and cannot be further memoized.
 // ─────────────────────────────────────────────────────────────
 
-function GameCanvas({ gameState, mapWidth, mapHeight, showIslandIds = false, cameraMode = 'dynamic' }: Props) {
+function GameCanvas({ gameState, mapWidth, mapHeight, showIslandIds = false, cameraMode = 'dynamic', disableInterpolation = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
@@ -312,11 +318,25 @@ function GameCanvas({ gameState, mapWidth, mapHeight, showIslandIds = false, cam
     }
   }, []);
 
+  // Track disableInterpolation in a ref so the draw loop can read it without
+  // being re-created on every prop change.
+  const disableInterpolationRef = useRef(disableInterpolation);
+  disableInterpolationRef.current = disableInterpolation;
+
   // ── Sync state on prop change (game tick) ─────────────────
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so currStateRef is updated *before* the
+  // next RAF callback fires. With useEffect the RAF would read stale state for
+  // one full paint cycle, making the canvas appear frozen during rapid slider
+  // scrubbing even though the React UI (HUD, controls) updates correctly.
+  useLayoutEffect(() => {
     prevStateRef.current = currStateRef.current;
     currStateRef.current = gameState;
-    lastTickRef.current = Date.now();
+    // When disableInterpolation is set (replay scrubbing), seed lastTickRef so
+    // tInterp evaluates to 1 on the very next draw call — ships jump directly
+    // to their recorded positions instead of animating from the previous frame.
+    lastTickRef.current = disableInterpolationRef.current
+      ? Date.now() - (gameState.config.tickRateMs ?? 100)
+      : Date.now();
 
     const prev = prevStateRef.current;
     if (prev) {
