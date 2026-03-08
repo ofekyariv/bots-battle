@@ -41,6 +41,8 @@ export default function ChallengePage() {
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [botsError, setBotsError] = useState<string | null>(null);
+  const [botsLoading, setBotsLoading] = useState(false);
 
   // Load challenge details
   useEffect(() => {
@@ -58,6 +60,8 @@ export default function ChallengePage() {
   // Load user's bots once authenticated
   useEffect(() => {
     if (!session?.user) return;
+    setBotsLoading(true);
+    setBotsError(null);
     fetch('/api/bots')
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -68,8 +72,12 @@ export default function ChallengePage() {
         setMyBots(data);
         if (data.length > 0) setSelectedBotId(data[0].id);
       })
-      .catch(() => {
+      .catch((e) => {
         setMyBots([]);
+        setBotsError(e instanceof Error ? e.message : 'Failed to load your bots');
+      })
+      .finally(() => {
+        setBotsLoading(false);
       });
   }, [session]);
 
@@ -189,8 +197,30 @@ export default function ChallengePage() {
                   ⚓ Sign in to Accept
                 </button>
               </div>
+            ) : botsLoading ? (
+              /* Loading bots */
+              <p className="text-gold/60 animate-pulse text-sm">Loading your bots...</p>
+            ) : botsError ? (
+              /* API error loading bots */
+              <div>
+                <p className="text-red-400 text-sm mb-3">{botsError}</p>
+                <button
+                  onClick={() => {
+                    setBotsLoading(true);
+                    setBotsError(null);
+                    fetch('/api/bots')
+                      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+                      .then((data: BotOption[]) => { setMyBots(data); if (data.length > 0) setSelectedBotId(data[0].id); })
+                      .catch((e) => { setMyBots([]); setBotsError(e instanceof Error ? e.message : 'Failed to load bots'); })
+                      .finally(() => setBotsLoading(false));
+                  }}
+                  className="w-full py-2 rounded-lg border border-gold/30 text-gold text-sm hover:bg-gold/10 transition-colors"
+                >
+                  🔄 Retry
+                </button>
+              </div>
             ) : myBots.length === 0 ? (
-              /* Logged in but no bots */
+              /* Logged in but genuinely no bots */
               <div>
                 <p className="text-slate-300 mb-4 text-sm">You need a bot to accept this challenge.</p>
                 <button
