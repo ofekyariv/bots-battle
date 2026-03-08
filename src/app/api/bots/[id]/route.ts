@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
 import { db } from '@/db';
 import { bots } from '@/db/schema';
@@ -109,6 +110,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       updated_at: bots.updatedAt,
     });
 
+  revalidatePath('/profile');
   return NextResponse.json(updated);
 }
 
@@ -139,5 +141,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .set({ isActive: false, updatedAt: new Date() })
     .where(and(eq(bots.id, id), eq(bots.userId, session.user.id)));
 
+  revalidatePath('/profile');
   return NextResponse.json({ success: true });
 }

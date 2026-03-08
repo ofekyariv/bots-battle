@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
 import { db } from '@/db';
 import { bots } from '@/db/schema';
@@ -89,5 +90,6 @@ export async function POST(req: NextRequest) {
       updated_at: bots.updatedAt,
     });
 
+  revalidatePath('/profile');
   return NextResponse.json(created, { status: 201 });
 }

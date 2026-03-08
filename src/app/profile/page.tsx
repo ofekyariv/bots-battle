@@ -1,6 +1,8 @@
 // ============================================================
 // 🏴☠️ /profile — Current user's profile (requires auth)
 // ============================================================
+export const dynamic = 'force-dynamic';
+
 import { redirect } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -248,7 +250,7 @@ export default async function ProfilePage() {
                       </div>
                     </div>
                     <Link
-                      href={`/editor?botId=${bot.id}`}
+                      href={`/editor?load=${bot.id}`}
                       className="shrink-0 px-3 py-1.5 rounded-md text-sm font-medium bg-gold/10 border border-gold/30 text-gold hover:bg-gold/20 transition-colors"
                     >
                       ✏️ Edit
